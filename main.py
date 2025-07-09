@@ -683,7 +683,9 @@ def handle_text_messages(message):
                 
                 bot.delete_message(chat_id, message.message_id)
                 bot.send_message(chat_id, f"📝 كم عدد الجواسيس؟\n(الحد الأقصى: {max_spies})", reply_markup=keyboard)
-                del user_states[user_id]
+                
+                # تغيير الحالة بدلاً من حذفها
+                user_states[user_id]['state'] = 'waiting_spies_selection'
                 
             except ValueError:
                 bot.send_message(chat_id, "❌ يرجى إدخال رقم صحيح")
@@ -698,8 +700,29 @@ def handle_text_messages(message):
                 games[chat_id]['duration'] = duration
                 bot.delete_message(chat_id, message.message_id)
                 
+                # الآن يمكن حذف الحالة لأن المستخدم انتهى من إدخال جميع البيانات
+                del user_states[user_id]
+                
                 # بدء اللعبة
                 start_actual_game(chat_id)
+                
+            except ValueError:
+                bot.send_message(chat_id, "❌ يرجى إدخال رقم صحيح")
+
+# دالة مساعدة لحساب الحد الأقصى للجواسيس
+def calculate_max_spies(normal_players):
+    # مثال: جاسوس واحد لكل 3-4 لاعبين عاديين
+    if normal_players <= 6:
+        return 1
+    elif normal_players <= 12:
+        return 2
+    elif normal_players <= 18:
+        return 3
+    elif normal_players <= 24:
+        return 4
+    else:
+        return 5 
+        
                 del user_states[user_id]
                 
             except ValueError:
