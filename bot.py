@@ -372,7 +372,7 @@ def spies_win(chat_id):
     game = games[chat_id]
     
     # فيديو فوز الجواسيس
-    video_url = "https://raw.githubusercontent.com/username/repository/main/spy_win.mp4"
+    video_url = "https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/spy_win.mp4"
     
     text = "🎉 فاز الجاسوس!\n"
     text += f"الموقع/الشيء: {game['secret_item']}\n\n"
@@ -404,7 +404,7 @@ def players_win(chat_id):
     game = games[chat_id]
     
     # فيديو فوز اللاعبين
-    video_url = "https://raw.githubusercontent.com/username/repository/main/players_win.mp4"
+    video_url = "https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/players_win.mp4"
     
     text = "🎊 فاز اللاعبون!\n"
     text += f"الموقع/الشيء: {game['secret_item']}\n\n"
