@@ -127,11 +127,23 @@ bot.command('newgame', async (ctx) => {
   await ctx.reply('🤔 حاب تبدا تلعب؟', keyboard);
 });
 
-// بدء اللعبة
+// بدء اللعبة - الكود المُصحح
 bot.action('start_game', async (ctx) => {
   const chatId = ctx.chat.id;
   
   await ctx.answerCbQuery();
+
+  // إنشاء اللعبة فعلياً في النظام - هذا هو الجزء المفقود!
+  const gameData = {
+    id: require('uuid').v4(),
+    chatId: chatId,
+    players: [],
+    status: 'waiting',
+    startTime: Date.now()
+  };
+  
+  // حفظ اللعبة في الذاكرة
+  gameLogic.activeGames.set(chatId, gameData);
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback('🟢 انضم للعبة', 'join_game')]
@@ -155,6 +167,7 @@ bot.action('start_game', async (ctx) => {
     }
   }, config.GAME_SETTINGS.JOIN_TIMEOUT);
 });
+
 
 // قواعد اللعبة
 bot.action('game_rules', async (ctx) => {
