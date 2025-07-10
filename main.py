@@ -724,7 +724,6 @@ def calculate_max_spies(normal_players):
         return 5 
         
                 del user_states[user_id]
-                
             except ValueError:
                 bot.send_message(chat_id, "❌ يرجى إدخال رقم صحيح")
         
