@@ -1024,12 +1024,13 @@ async def handle_account_number(update: Update, context: ContextTypes.DEFAULT_TY
 # أوامر الإدارة
 async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """حظر مستخدم (للمطور فقط)"""
-    if update.effective_user.username != DEVELOPER_ID:tg:6680350152
+    if update.effective_user.id != 6680350152:  # معرف المطور الرقمي
         return
+
     if not context.args:
         await update.message.reply_text("استخدم: /ban [معرف المستخدم]")
         return
-    
+
     try:
         user_id = int(context.args[0])
         banned_users.add(user_id)
@@ -1040,13 +1041,13 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """إلغاء حظر مستخدم (للمطور فقط)"""
-    if update.effective_user.username != DEVELOPER_ID:
+    if update.effective_user.id != 6680350152:  # معرف المطور الرقمي
         return
-    
+
     if not context.args:
         await update.message.reply_text("استخدم: /unban [معرف المستخدم]")
         return
-    
+
     try:
         user_id = int(context.args[0])
         banned_users.discard(user_id)
@@ -1064,6 +1065,7 @@ async def group_joined(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 "اضغط على /newgame للبدء."
             )
             break
+
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """معالج الأخطاء"""
