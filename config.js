@@ -20,7 +20,7 @@ module.exports = {
   },
   
   VIDEOS: {
-    SPY_WIN: 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/spy_win.mp4',
+    SPY_WIN: 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/spy_win%20%282%29.mp4',
     PLAYERS_WIN: 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/players_win.mp4'
   },
   
