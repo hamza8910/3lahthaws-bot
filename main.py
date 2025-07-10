@@ -725,10 +725,8 @@ def calculate_max_spies(normal_players):
         
 # الآن يمكن حذف الحالة لأن المستخدم انتهى من إدخال جميع البيانات
                 del user_states[user_id]
-                
                 # بدء اللعبة
                 start_actual_game(chat_id)
-                
             except ValueError:
                 bot.send_message(chat_id, "❌ يرجى إدخال رقم صحيح")
         
