@@ -1,6 +1,6 @@
 module.exports = {
-  BOT_TOKEN: process.env.BOT_TOKEN || 'YOUR_BOT_TOKEN_HERE',
-  DEVELOPER_ID: process.env.DEVELOPER_ID || 'V_b_L_o',
+  BOT_TOKEN: process.env.BOT_TOKEN || '8193578494:AAGOBjuR6l6_sqB-W5rh56t6_tjyQmxdcsc',
+  DEVELOPER_ID: process.env.DEVELOPER_ID || '6680350152',
   GROUP_INVITE_LINK: 'https://t.me/+0ipdbPwuF304OWRk',
   BOT_USERNAME: 'spy_spy_bbot',
   
