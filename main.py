@@ -1,4 +1,3 @@
-
 import logging
 import asyncio
 import random
@@ -1027,7 +1026,6 @@ async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """حظر مستخدم (للمطور فقط)"""
     if update.effective_user.username != DEVELOPER_ID:tg:6680350152
         return
-    
     if not context.args:
         await update.message.reply_text("استخدم: /ban [معرف المستخدم]")
         return
