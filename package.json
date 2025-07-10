@@ -1,0 +1,22 @@
+{
+  "name": "spyfall-bot",
+  "version": "1.0.0",
+  "description": "لعبة Spyfall التلقرام بوت",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.0",
+    "node-cron": "^3.0.3",
+    "sqlite3": "^5.1.6",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
