@@ -15,8 +15,8 @@ module.exports = {
   },
   
   IMAGES: {
-    WELCOME: 'https://pin.it/2qzWrzy',
-    SPY_ROLE: 'https://pin.it/2Xv5gZUHU'
+    WELCOME: 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/Welcome.jpg',
+    SPY_ROLE: 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/Spy_role.jpg'
   },
   
   VIDEOS: {
