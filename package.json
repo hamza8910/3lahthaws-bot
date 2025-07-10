@@ -2,10 +2,10 @@
   "name": "spyfall-bot",
   "version": "1.0.0",
   "description": "لعبة Spyfall التلقرام بوت",
-  "main": "app.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "start": "node main.js",
+    "dev": "nodemon main.js"
   },
   "dependencies": {
     "telegraf": "^4.15.0",
