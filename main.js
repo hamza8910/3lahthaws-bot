@@ -309,27 +309,39 @@ async function handleGameSetup(ctx, gameState, text) {
     gameState.step = 'awaiting_duration';
     await ctx.reply('📝 كم دقيقة تريدون هذه البارتية؟\n(من 1 إلى 15)');
 
-  } else if (gameState.step === 'awaiting_duration') {
-    if (number < 1 || number > 15) {
-      return ctx.reply('يجب أن تكون مدة البارتية من 1 إلى 15 دقيقة');
-    }
+} else if (gameState.step === 'awaiting_duration') {
+  if (number < 1 || number > 15) {
+    return ctx.reply('يجب أن تكون مدة البارتية من 1 إلى 15 دقيقة');
+  }
 
-    gameState.duration = number;
-    gameStates.delete(chatId);
+  gameState.duration = number;
+  
+  // التحقق من عدد اللاعبين أولاً
+  const currentGame = gameLogic.getGameStatus(chatId);
+  const playersJoined = currentGame ? currentGame.players.length : 0;
+  const totalNeeded = gameState.normalPlayers + gameState.spiesCount;
 
-    await ctx.reply('📨 ارسل لي كلمة start في الخاص لترى دورك');
+  if (playersJoined !== totalNeeded) {
+    return ctx.reply(`❌ يجب أن ينضم ${totalNeeded} لاعب بالضبط قبل بدء اللعبة\nالعدد الحالي: ${playersJoined} لاعب\nمطلوب: ${totalNeeded} لاعب`);
+  }
 
-    // إعداد اللعبة
-    const result = await gameLogic.setupGame(chatId, gameState.normalPlayers, gameState.spiesCount, gameState.duration);
-    if (result.success) {
-      setTimeout(async () => {
-        await ctx.reply('📢 صَيَّبو مدينا الأدوار، ابداو تلعبو! 🎲🕰️');
-      }, 10000);
-    } else {
-      await ctx.reply(`❌ ${result.message}`);
-    }
+  // حذف حالة اللعبة مرة واحدة فقط
+  gameStates.delete(chatId);
+
+  // إرسال الرسالة مرة واحدة فقط
+  await ctx.reply('📨 ارسل لي كلمة start في الخاص لترى دورك');
+
+  // إعداد اللعبة
+  const result = await gameLogic.setupGame(chatId, gameState.normalPlayers, gameState.spiesCount, gameState.duration);
+  if (result.success) {
+    setTimeout(async () => {
+      await ctx.reply('📢 صَيَّبو مدينا الأدوار، ابداو تلعبو! 🎲🕰️');
+    }, 10000);
+  } else {
+    await ctx.reply(`❌ ${result.message}`);
   }
 }
+
 
 // معالج الأوامر الخاصة
 async function handlePrivateCommands(ctx, text) {
