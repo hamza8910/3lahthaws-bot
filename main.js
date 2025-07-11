@@ -1,9 +1,10 @@
+
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 
 // إعدادات البوت
-const token = process.env.BOT_TOKEN || 'التوكن_الافتراضي';
+const token = '8193578494:AAGOBjuR6l6_sqB-W5rh56t6_tjyQmxdcsc';
 const developerId = 6680350152;
 const developerUsername = '@V_b_L_o';
 
@@ -1000,3 +1001,4 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (error) => {
     console.log('خطأ غير متوقع:', error);
 });
+
