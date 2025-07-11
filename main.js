@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 // إعدادات البوت
-const token = '8193578494:AAGOBjuR6l6_sqB-W5rh56t6_tjyQmxdcsc';
+const token = process.env.BOT_TOKEN || 'التوكن_الافتراضي';
 const developerId = 6680350152;
 const developerUsername = '@V_b_L_o';
 
