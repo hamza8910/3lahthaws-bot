@@ -9,7 +9,7 @@
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0"
   },
-  "keywords": ["telegram", "bot", "spyfall", "game">
+  "keywords": ["telegram", "bot", "spyfall", "game"]
   "author": "@V_b_L_o",
   "license": "MIT"
 }
