@@ -2,10 +2,10 @@
   "name": "spyfall-bot",
   "version": "1.0.0",
   "description": "Telegram Bot for Spyfall Game",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "start": "node main.js",
+    "dev": "node main.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0"
