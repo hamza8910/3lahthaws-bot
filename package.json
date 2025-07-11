@@ -1,22 +1,16 @@
+
 {
   "name": "spyfall-bot",
   "version": "1.0.0",
-  "description": "لعبة Spyfall التلقرام بوت",
+  "description": "بوت تيليجرام للعبة Spyfall",
   "main": "main.js",
   "scripts": {
-    "start": "node main.js",
-    "dev": "nodemon main.js"
+    "start": "node main.js"
   },
   "dependencies": {
-    "telegraf": "^4.15.0",
-    "node-cron": "^3.0.3",
-    "sqlite3": "^5.1.6",
-    "uuid": "^9.0.1"
+    "node-telegram-bot-api": "^0.61.0"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=16.0.0"
-  }
+  "keywords": ["telegram", "bot", "spyfall", "game">
+  "author": "@V_b_L_o",
+  "license": "MIT"
 }
