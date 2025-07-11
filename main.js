@@ -1,22 +1,151 @@
 const TelegramBot = require('node-telegram-bot-api');
-const config = require('./config.js');
-const database = require('./database.js');
-const gameLogic = require('./gameLogic.js');
-const banking = require('./banking.js');
-const shop = require('./shop.js');
 const fs = require('fs');
 const path = require('path');
 
-// تهيئة البوت
-const bot = new TelegramBot(config.BOT_TOKEN, { polling: true });
+// إعدادات البوت
+const token = process.env.BOT_TOKEN || 'التوكن_الافتراضي';
+const developerId = 6680350152;
+const developerUsername = '@V_b_L_o';
 
-// متغيرات عامة
-let activeGames = new Map();
-let userStates = new Map();
-let bannedUsers = new Set();
+// إنشاء البوت
+const bot = new TelegramBot(token, { polling: true });
 
-// رسائل ثابتة
-const GAME_RULES = `📜 **قواعد اللعبة:**
+// تحميل البيانات
+let data = {};
+try {
+    data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
+} catch (error) {
+    data = {
+        users: {},
+        games: {},
+        banned: [],
+        shops: {},
+        banks: {},
+        stats: {}
+    };
+}
+
+// حفظ البيانات
+function saveData() {
+    fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
+}
+
+// قوائم الأماكن والأشياء
+const places = [
+    'المطعم', 'المدرسة', 'المستشفى', 'البنك', 'الحديقة', 'الشاطئ', 'المطار', 'المتجر', 'المكتبة', 'الجامعة',
+    'الملعب', 'السينما', 'الفندق', 'المسجد', 'الكنيسة', 'المتحف', 'الحديقة الحيوانية', 'المسرح', 'الملاهي', 'القطار',
+    'الباص', 'السيارة', 'الطائرة', 'السفينة', 'البيت', 'الشقة', 'الفيلا', 'المزرعة', 'الغابة', 'الجبل'
+];
+
+const items = [
+    'التفاح', 'الموز', 'البرتقال', 'العنب', 'الفراولة', 'الأناناس', 'المانجو', 'الكيوي', 'الخوخ', 'الإجاص',
+    'الليمون', 'الجوافة', 'الرمان', 'التين', 'التمر', 'الجزر', 'الطماطم', 'الخيار', 'الباذنجان', 'الفلفل',
+    'البصل', 'الثوم', 'البطاطس', 'الكوسا', 'الملفوف', 'الخس', 'السبانخ', 'البقدونس', 'النعناع', 'الزعتر'
+];
+
+// قائمة المتجر
+const shopItems = {
+    'تبون': 100000000,
+    'شنڤريحة': 200000000,
+    'شاب بيلو': 300000000,
+    'ديدين كلاش': 400000000,
+    'ايناس عبدلي': 500000000,
+    'ريفكا': 600000000,
+    'كريم': 700000000,
+    'عادل ميكسيك': 800000000,
+    'مراد طهاري': 900000000
+};
+
+// فحص إذا كان المستخدم محظور
+function isBanned(userId) {
+    return data.banned.includes(userId);
+}
+
+// فحص إذا كان المستخدم مشرف
+async function isAdmin(chatId, userId) {
+    try {
+        const chatMember = await bot.getChatMember(chatId, userId);
+        return ['creator', 'administrator'].includes(chatMember.status);
+    } catch (error) {
+        return false;
+    }
+}
+
+// فحص إذا كان البوت مشرف
+async function isBotAdmin(chatId) {
+    try {
+        const botInfo = await bot.getMe();
+        const chatMember = await bot.getChatMember(chatId, botInfo.id);
+        return ['creator', 'administrator'].includes(chatMember.status);
+    } catch (error) {
+        return false;
+    }
+}
+
+// رسالة البداية
+bot.onText(/\/start/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
+    if (msg.chat.type === 'private') {
+        const welcomeText = `🕵️‍♂️ لعبة Spyfall هي لعبة اجتماعية قصيرة (3–30 لاعبين)
+يجتهد فيها "الجاسوس" في تخمين مكان سري،
+بينما يحاول الآخرون كشفه بأسئلة ذكية،
+أو ينتصر الجاسوس إذا ظل خفيًا أو خمن المكان.
+🔗 رابط المجموعة: https://t.me/+0ipdbPwuF304OWRk
+👨‍💻 المطور: @V_b_L_o`;
+
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '🔘 اضغط هنا باه تفهم', callback_data: 'rules' }],
+                [{ text: '🔘 اضفني لمجموعتك لبدأ اللعبة', url: 'http://t.me/spy_spy_bbot?startgroup=new' }]
+            ]
+        };
+
+        try {
+            await bot.sendPhoto(chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/Welcome.jpg', {
+                caption: welcomeText,
+                reply_markup: keyboard
+            });
+        } catch (error) {
+            await bot.sendMessage(chatId, welcomeText, { reply_markup: keyboard });
+        }
+    }
+});
+
+// أوامر البوت
+bot.setMyCommands([
+    { command: 'start', description: 'بدء البوت' },
+    { command: 'newgame', description: 'بدء لعبة جديدة' },
+    { command: 'help', description: 'المساعدة' },
+    { command: 'profile', description: 'إحصائياتي' },
+    { command: 'shop', description: 'المتجر' },
+    { command: 'bank', description: 'البنك' },
+    { command: 'stats', description: 'إحصائيات المجموعة' }
+]);
+
+// معالجة الأزرار
+bot.on('callback_query', async (callbackQuery) => {
+    const msg = callbackQuery.message;
+    const chatId = msg.chat.id;
+    const userId = callbackQuery.from.id;
+    const data_callback = callbackQuery.data;
+
+    if (isBanned(userId)) {
+        return bot.answerCallbackQuery(callbackQuery.id, { 
+            text: 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o',
+            show_alert: true 
+        });
+    }
+
+    try {
+        // معالجة قواعد اللعبة
+        if (data_callback === 'rules') {
+            const rulesText = `📜 قواعد اللعبة:
 [●] ممنوع شخص يتسأل مرتين ورا بعض
 [●] أي لاعب يقدر دايما يبدأ تصويت على لاعب تاني شك فيه، والأغلبية تفوز
 [●] لو الأغلبية شكوا في لاعب، حقهم يعرفوا كان جاسوس ولا لأ، ولو كان جاسوس يطرد
@@ -33,1024 +162,841 @@ const GAME_RULES = `📜 **قواعد اللعبة:**
 – فريق يعرف المكان/الاكلـة
 – فريق جواسيس مش عارفينه`;
 
-const WELCOME_TEXT = `🕵️‍♂️ لعبة Spyfall هي لعبة اجتماعية قصيرة (3–30 لاعبين)
-يجتهد فيها "الجاسوس" في تخمين مكان سري،
-بينما يحاول الآخرون كشفه بأسئلة ذكية،
-أو ينتصر الجاسوس إذا ظل خفيًا أو خمن المكان.
-🔗 رابط المجموعة: https://t.me/+0ipdbPwuF304OWRk
-👨‍💻 المطور: @V_b_L_o`;
-
-// =======================
-// مساعدات مفيدة
-// =======================
-
-async function isBotAdmin(chatId) {
-    try {
-        const botInfo = await bot.getMe();
-        const member = await bot.getChatMember(chatId, botInfo.id);
-        return ['creator', 'administrator'].includes(member.status);
-    } catch (error) {
-        console.error('Error checking bot admin status:', error);
-        return false;
-    }
-}
-
-async function isUserAdmin(chatId, userId) {
-    try {
-        const member = await bot.getChatMember(chatId, userId);
-        return ['creator', 'administrator'].includes(member.status);
-    } catch (error) {
-        return false;
-    }
-}
-
-function isUserBanned(userId) {
-    return bannedUsers.has(userId);
-}
-
-function logUserAction(userId, action, details = '') {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] User ${userId}: ${action} ${details}`);
-}
-
-function safeDeleteMessage(chatId, messageId) {
-    bot.deleteMessage(chatId, messageId).catch(() => {
-        // تجاهل أخطاء الحذف
-    });
-}
-
-async function sendTypingAction(chatId) {
-    try {
-        await bot.sendChatAction(chatId, 'typing');
-    } catch (error) {
-        // تجاهل الأخطاء
-    }
-}
-
-// =======================
-// أمر البداية /start
-// =======================
-
-bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const firstName = msg.from.first_name || 'المستخدم';
-    
-    logUserAction(userId, 'COMMAND_START');
-    await sendTypingAction(chatId);
-    
-    // التحقق من الإقصاء
-    if (isUserBanned(userId)) {
-        return bot.sendMessage(chatId, `${firstName}، أنت مقصي من اللعبة 🚫\nاتصل بالمطور للإفراج عنك\nالمطور: @V_b_L_o`);
-    }
-    
-    const welcomeKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '🔘 اضغط هنا باه تفهم', callback_data: 'show_rules' }
-                ],
-                [
-                    { text: '🔘 اضفني لمجموعتك لبدأ اللعبة', url: 'http://t.me/spy_spy_bbot?startgroup=new' }
-                ]
-            ]
+            await bot.sendMessage(userId, rulesText);
         }
-    };
-    
-    try {
-        // محاولة إرسال الصورة مع النص
-        await bot.sendPhoto(chatId, 'https://pin.it/2qzWrzyQO', {
-            caption: `مرحباً ${firstName}! 👋\n\n${WELCOME_TEXT}`,
-            ...welcomeKeyboard,
-            parse_mode: 'HTML'
-        });
-    } catch (error) {
-        // في حالة فشل الصورة، أرسل النص فقط
-        await bot.sendMessage(chatId, `مرحباً ${firstName}! 👋\n\n${WELCOME_TEXT}`, {
-            ...welcomeKeyboard,
-            parse_mode: 'HTML'
-        });
-    }
-    
-    // إضافة المستخدم لقاعدة البيانات
-    database.addUser(userId, firstName);
-});
 
-// =======================
-// معالجة النقر على الأزرار
-// =======================
+        // معالجة بدء اللعبة
+        else if (data_callback === 'start_game') {
+            if (msg.chat.type === 'private') return;
+            
+            const gameId = chatId + '_' + Date.now();
+            data.games[gameId] = {
+                chatId: chatId,
+                status: 'joining',
+                players: [],
+                gameType: null,
+                normalPlayers: 0,
+                spies: 0,
+                duration: 0,
+                currentItem: null,
+                votes: {},
+                startTime: null,
+                joinStartTime: Date.now()
+            };
+            
+            const joinKeyboard = {
+                inline_keyboard: [
+                    [{ text: '🟢 انضم للعبة', callback_data: `join_${gameId}` }],
+                    [{ text: '🟠 كيفاه تتعلب هذي اللعبة', callback_data: 'rules' }],
+                    [{ text: '🟣 انضم للقناة للمزيد من المتعة', url: 'https://t.me/+0ipdbPwuF304OWRk' }]
+                ]
+            };
 
-bot.on('callback_query', async (query) => {
-    const chatId = query.message.chat.id;
-    const userId = query.from.id;
-    const data = query.data;
-    const firstName = query.from.first_name || 'المستخدم';
-    
-    logUserAction(userId, 'CALLBACK_QUERY', data);
-    
-    // التحقق من الإقصاء
-    if (isUserBanned(userId)) {
-        return bot.answerCallbackQuery(query.id, '❌ أنت مقصي من اللعبة! اتصل بالمطور @V_b_L_o', true);
-    }
-    
-    await sendTypingAction(chatId);
-    
-    switch (data) {
-        case 'show_rules':
-            await handleShowRules(query);
-            break;
+            await bot.editMessageText('🤔 حاب تبدا تلعب؟', {
+                chat_id: chatId,
+                message_id: msg.message_id,
+                reply_markup: joinKeyboard
+            });
+
+            // مؤقت الانضمام (90 ثانية)
+            setTimeout(async () => {
+                if (data.games[gameId] && data.games[gameId].status === 'joining') {
+                    if (data.games[gameId].players.length < 3) {
+                        await bot.sendMessage(chatId, 'لم ينضم عدد كافي من اللاعبين. تم إلغاء اللعبة.');
+                        delete data.games[gameId];
+                        saveData();
+                        return;
+                    }
+
+                    const typeKeyboard = {
+                        inline_keyboard: [
+                            [{ text: '📦 اشياء', callback_data: `type_items_${gameId}` }],
+                            [{ text: '📍 اماكن', callback_data: `type_places_${gameId}` }]
+                        ]
+                    };
+
+                    await bot.sendMessage(chatId, 'واش حابين؟', { reply_markup: typeKeyboard });
+                }
+            }, 90000);
             
-        case 'start_new_game':
-            await handleStartNewGame(query);
-            break;
+            saveData();
+        }
+
+        // معالجة الانضمام للعبة
+        else if (data_callback.startsWith('join_')) {
+            const gameId_join = data_callback.substring(5);
+            const game = data.games[gameId_join];
             
-        case 'join_game':
-            await handleJoinGame(query);
-            break;
-            
-        case 'game_instructions':
-            await handleGameInstructions(query);
-            break;
-            
-        case 'select_objects':
-        case 'select_places':
-            await handleGameTypeSelection(query, data);
-            break;
-            
-        default:
-            if (data.startsWith('vote_')) {
-                await handleVoting(query);
-            } else if (data.startsWith('shop_')) {
-                await shop.handleShopCallback(query, bot);
-            } else if (data.startsWith('bank_')) {
-                await banking.handleBankCallback(query, bot);
+            if (!game) {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'اللعبة غير موجودة',
+                    show_alert: true 
+                });
             }
-            break;
+
+            if (game.status !== 'joining') {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'اللعبة شغالة انتظر تخلص',
+                    show_alert: true 
+                });
+            }
+
+            if (game.players.find(p => p.id === userId)) {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'أنت مسجل بالفعل',
+                    show_alert: true 
+                });
+            }
+
+            game.players.push({
+                id: userId,
+                name: callbackQuery.from.first_name,
+                username: callbackQuery.from.username
+            });
+
+            let playersList = game.players.map((player, index) => `${index + 1}. ${player.name}`).join('\n');
+            
+            await bot.editMessageText(`🟢 اللاعبون المنضمون:\n${playersList}`, {
+                chat_id: chatId,
+                message_id: msg.message_id,
+                reply_markup: msg.reply_markup
+            });
+
+            saveData();
+        }
+
+        // معالجة اختيار نوع اللعبة
+        else if (data_callback.startsWith('type_')) {
+            const parts = data_callback.split('_');
+            const gameType = parts[1];
+            const gameId_type = parts.slice(2).join('_');
+            
+            const game_type = data.games[gameId_type];
+            
+            if (!game_type) {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'اللعبة غير موجودة',
+                    show_alert: true 
+                });
+            }
+            
+            game_type.gameType = gameType;
+            game_type.status = 'configuring';
+            
+            await bot.sendMessage(chatId, '📝 كم عدد الأشخاص العاديين؟ (3-30)');
+            
+            data.games[gameId_type].waitingFor = 'normalPlayers';
+            saveData();
+        }
+
+        // معالجة التصويت
+        else if (data_callback.startsWith('vote_')) {
+            const parts = data_callback.split('_');
+            const targetId = parts[1];
+            const gameId_vote = parts.slice(2).join('_');
+            
+            const game_vote = data.games[gameId_vote];
+            
+            if (!game_vote || game_vote.status !== 'voting') {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'اللعبة غير موجودة أو انتهت',
+                    show_alert: true 
+                });
+            }
+            
+            if (game_vote.votes[userId]) {
+                return bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: 'لا يمكن التصويت مرتين',
+                    show_alert: true 
+                });
+            }
+            
+            game_vote.votes[userId] = targetId;
+            
+            const targetPlayer = game_vote.players.find(p => p.id.toString() === targetId);
+            const voterPlayer = game_vote.players.find(p => p.id === userId);
+            
+            if (targetPlayer && voterPlayer) {
+                await bot.sendMessage(game_vote.chatId, `${voterPlayer.name} صوت لإعدام ${targetPlayer.name} 🗳️`);
+            }
+            
+            const totalVotes = Object.keys(game_vote.votes).length;
+            if (totalVotes === game_vote.players.length) {
+                await endGame(gameId_vote);
+            }
+            
+            saveData();
+        }
+
+        // معالجة خيارات البنك
+        else if (data_callback.startsWith('bank_')) {
+            const bankName = data_callback.substring(5);
+            const accountNumber = Math.floor(Math.random() * 10000) + '-' + Math.floor(Math.random() * 10000);
+            
+            if (!data.banks[userId]) {
+                data.banks[userId] = {
+                    bank: bankName,
+                    account: accountNumber,
+                    balance: 0
+                };
+            }
+            
+            await bot.sendMessage(chatId, `🏦 تم فتح الحساب في بنك ${bankName}\n💰 رصيدك: 0 د.ج\n🔢 رقم الحساب: ${accountNumber}`);
+            saveData();
+        }
+
+        // إنهاء معالجة الزر بنجاح
+        bot.answerCallbackQuery(callbackQuery.id, { text: '' });
+
+    } catch (error) {
+        console.error('خطأ في معالجة الزر:', error);
+        bot.answerCallbackQuery(callbackQuery.id, { 
+            text: 'حدث خطأ، حاول مرة أخرى',
+            show_alert: true 
+        });
     }
 });
 
-// =======================
-// دوال معالجة الأزرار
-// =======================
-
-async function handleShowRules(query) {
-    const chatId = query.message.chat.id;
-    
-    await bot.sendMessage(chatId, GAME_RULES, {
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '🔙 العودة للقائمة الرئيسية', callback_data: 'back_to_main' }]
-            ]
-        }
-    });
-    
-    bot.answerCallbackQuery(query.id, '✅ تم عرض القواعد');
-}
-
-async function handleStartNewGame(query) {
-    const chatId = query.message.chat.id;
-    const userId = query.from.id;
-    
-    // التحقق من وجود لعبة جارية
-    if (activeGames.has(chatId)) {
-        return bot.answerCallbackQuery(query.id, '❌ لا يمكن بداية لعبة جديدة حتى تكمل البارتية!', true);
-    }
-    
-    // إنشاء لعبة جديدة
-    const newGame = gameLogic.createNewGame(chatId, userId);
-    activeGames.set(chatId, newGame);
-    
-    const gameKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '🟢 انضم للعبة', callback_data: 'join_game' }
-                ],
-                [
-                    { text: '🟠 كيفاه تتعلب هذي اللعبة', callback_data: 'game_instructions' }
-                ],
-                [
-                    { text: '🟣 انضم للقناة للمزيد من المتعة', url: 'https://t.me/+0ipdbPwuF304OWRk' }
-                ]
-            ]
-        }
-    };
-    
-    await bot.editMessageText('🎮 **لعبة جديدة جاهزة!**\n\n⏳ مدة الانضمام: دقيقة ونصف\n👥 اللاعبين حالياً: 0', {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-        parse_mode: 'Markdown',
-        ...gameKeyboard
-    });
-    
-    // تايمر انتهاء الانضمام
-    setTimeout(() => {
-        proceedToGameSetup(chatId);
-    }, 90000);
-    
-    bot.answerCallbackQuery(query.id, '✅ تم إنشاء لعبة جديدة!');
-}
-
-async function handleJoinGame(query) {
-    const chatId = query.message.chat.id;
-    const userId = query.from.id;
-    const firstName = query.from.first_name || 'مجهول';
-    
-    const game = activeGames.get(chatId);
-    if (!game || game.status !== 'waiting_players') {
-        return bot.answerCallbackQuery(query.id, '❌ لا توجد لعبة متاحة للانضمام!', true);
-    }
-    
-    // التحقق من الانضمام المسبق
-    if (game.players.some(p => p.id === userId)) {
-        return bot.answerCallbackQuery(query.id, '⚠️ أنت منضم بالفعل!', true);
-    }
-    
-    // إضافة اللاعب
-    gameLogic.addPlayer(game, { id: userId, name: firstName });
-    
-    // تحديث الرسالة
-    await updateGameMessage(chatId, query.message.message_id, game);
-    
-    bot.answerCallbackQuery(query.id, `✅ مرحباً ${firstName}! تم انضمامك للعبة`);
-    logUserAction(userId, 'JOINED_GAME', `Players: ${game.players.length}`);
-}
-
-async function handleGameInstructions(query) {
-    const chatId = query.message.chat.id;
-    
-    await bot.sendMessage(chatId, GAME_RULES, {
-        parse_mode: 'Markdown'
-    });
-    
-    bot.answerCallbackQuery(query.id, '📖 تم عرض تعليمات اللعبة');
-}
-
-async function handleGameTypeSelection(query, type) {
-    const chatId = query.message.chat.id;
-    const userId = query.from.id;
-    
-    const game = activeGames.get(chatId);
-    if (!game || game.createdBy !== userId) {
-        return bot.answerCallbackQuery(query.id, '❌ يمكن لمنشئ اللعبة فقط اختيار النوع!', true);
-    }
-    
-    game.gameType = type === 'select_objects' ? 'objects' : 'places';
-    game.status = 'setting_up';
-    
-    userStates.set(userId, { 
-        step: 'waiting_normal_players', 
-        chatId: chatId 
-    });
-    
-    await bot.editMessageText(`📝 **إعداد اللعبة**\n\n🎯 النوع المختار: ${game.gameType === 'objects' ? 'أشياء 📦' : 'أماكن 📍'}\n\n❓ **كم عدد الأشخاص العاديين؟**\n📊 (من 3 إلى 30 لاعب)`, {
-        chat_id: chatId,
-        message_id: query.message.message_id,
-        parse_mode: 'Markdown'
-    });
-    
-    bot.answerCallbackQuery(query.id, '✅ تم اختيار نوع اللعبة');
-}
-
-// =======================
 // معالجة الرسائل النصية
-// =======================
-
 bot.on('message', async (msg) => {
-    if (msg.text && msg.text.startsWith('/')) return; // تجاهل الأوامر
-    
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const text = msg.text;
-    
-    if (!text) return;
-    
-    // التحقق من الإقصاء
-    if (isUserBanned(userId)) return;
-    
-    const userState = userStates.get(userId);
-    if (!userState) return;
-    
-    await sendTypingAction(chatId);
-    
-    switch (userState.step) {
-        case 'waiting_normal_players':
-            await handleNormalPlayersInput(msg, userState);
-            break;
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
+    // معالجة إعدادات اللعبة
+    const activeGame = Object.values(data.games).find(game => 
+        game.chatId === chatId && game.status === 'configuring'
+    );
+
+    if (activeGame && activeGame.waitingFor && /^\d+$/.test(text)) {
+        const num = parseInt(text);
+        
+        switch (activeGame.waitingFor) {
+            case 'normalPlayers':
+                if (num >= 3 && num <= 30) {
+                    activeGame.normalPlayers = num;
+                    activeGame.waitingFor = 'spies';
+                    await bot.sendMessage(chatId, '📝 كم عدد الجواسيس؟ (1-10)');
+                } else {
+                    await bot.sendMessage(chatId, 'العدد يجب أن يكون بين 3 و 30');
+                }
+                break;
+                
+            case 'spies':
+                if (num >= 1 && num <= 10) {
+                    // التحقق من نسبة الجواسيس
+                    if (num <= Math.floor(activeGame.normalPlayers / 3)) {
+                        activeGame.spies = num;
+                        activeGame.waitingFor = 'duration';
+                        await bot.sendMessage(chatId, '📝 كم دقيقة تريدون هذه البارتية؟ (1-15)');
+                    } else {
+                        await bot.sendMessage(chatId, 'عدد الجواسيس كثير! لكل 3 لاعبين جاسوس واحد');
+                    }
+                } else {
+                    await bot.sendMessage(chatId, 'العدد يجب أن يكون بين 1 و 10');
+                }
+                break;
+                
+            case 'duration':
+                if (num >= 1 && num <= 15) {
+                    activeGame.duration = num;
+                    activeGame.waitingFor = null;
+                    
+                    await bot.sendMessage(chatId, 'ارسل لي كلمة start في الخاص ل ترى دورك');
+                    
+                    // توزيع الأدوار
+                    await distributeRoles(activeGame);
+                } else {
+                    await bot.sendMessage(chatId, 'المدة يجب أن تكون بين 1 و 15 دقيقة');
+                }
+                break;
+        }
+        
+        saveData();
+        return;
+    }
+
+    // معالجة كلمة start في الخاص
+    if (text === 'start' && msg.chat.type === 'private') {
+        const userGames = Object.values(data.games).filter(game => 
+            game.players.find(p => p.id === userId) && game.status === 'distributing'
+        );
+        
+        if (userGames.length > 0) {
+            const game = userGames[0];
+            const player = game.players.find(p => p.id === userId);
             
-        case 'waiting_spies_count':
-            await handleSpiesCountInput(msg, userState);
-            break;
-            
-        case 'waiting_game_duration':
-            await handleGameDurationInput(msg, userState);
-            break;
-            
-        default:
-            // معالجة أوامر المتجر والبنك
-            if (msg.chat.type === 'private') {
-                await handlePrivateCommands(msg);
+            if (player.role === 'spy') {
+                await bot.sendMessage(chatId, 'أنت هو الجاسوس 🕵️‍♂️ اعرف كيفاه تلعب وتجاوب، ماتخليهمش يكشفوك!');
+                try {
+                    await bot.sendPhoto(chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/Spy_role.jpg');
+                } catch (error) {
+                    console.log('خطأ في إرسال صورة الجاسوس');
+                }
+            } else {
+                await bot.sendMessage(chatId, `أنت ماكش جاسوس 🚫🕵️\nال${game.gameType === 'items' ? 'شيء' : 'مكان'}: ${game.currentItem}`);
             }
-            break;
+        }
+        return;
+    }
+
+    // أوامر المتجر والبنك
+    if (text.startsWith('شراء ')) {
+        await handlePurchase(chatId, userId, text);
+        return;
+    }
+
+    if (text.startsWith('بيع ')) {
+        await handleSell(chatId, userId, text);
+        return;
+    }
+
+    if (text.startsWith('فارسي ')) {
+        await handleTransfer(chatId, userId, text);
+        return;
+    }
+
+    if (text === 'ممتلكاتي') {
+        await showUserItems(chatId, userId);
+        return;
+    }
+
+    if (text === 'حلي بونكا') {
+        await showBankOptions(chatId, userId);
+        return;
     }
 });
 
-async function handleNormalPlayersInput(msg, userState) {
-    const count = parseInt(msg.text);
-    const game = activeGames.get(userState.chatId);
-    
-    if (!game) {
-        userStates.delete(msg.from.id);
-        return;
-    }
-    
-    if (count < 3 || count > 30) {
-        return bot.sendMessage(msg.chat.id, '❌ **عدد غير صحيح!**\n\n📊 يجب أن يكون العدد بين 3 و 30 لاعب', {
-            parse_mode: 'Markdown'
-        });
-    }
-    
-    game.normalPlayersCount = count;
-    userState.step = 'waiting_spies_count';
-    
-    const maxSpies = Math.floor(count / 3);
-    
-    await bot.sendMessage(msg.chat.id, `✅ **تم تحديد عدد اللاعبين العاديين: ${count}**\n\n❓ **كم عدد الجواسيس؟**\n🕵️ (من 1 إلى ${maxSpies} جاسوس)`, {
-        parse_mode: 'Markdown'
-    });
-    
-    safeDeleteMessage(msg.chat.id, msg.message_id);
-}
-
-async function handleSpiesCountInput(msg, userState) {
-    const count = parseInt(msg.text);
-    const game = activeGames.get(userState.chatId);
-    
-    if (!game) {
-        userStates.delete(msg.from.id);
-        return;
-    }
-    
-    const maxSpies = Math.floor(game.normalPlayersCount / 3);
-    
-    if (count < 1 || count > maxSpies) {
-        return bot.sendMessage(msg.chat.id, `❌ **عدد غير صحيح!**\n\n🕵️ يجب أن يكون عدد الجواسيس بين 1 و ${maxSpies}`, {
-            parse_mode: 'Markdown'
-        });
-    }
-    
-    game.spiesCount = count;
-    userState.step = 'waiting_game_duration';
-    
-    await bot.sendMessage(msg.chat.id, `✅ **تم تحديد عدد الجواسيس: ${count}**\n\n❓ **كم دقيقة تريدون هذه البارتية؟**\n⏰ (من 1 إلى 15 دقيقة)`, {
-        parse_mode: 'Markdown'
-    });
-    
-    safeDeleteMessage(msg.chat.id, msg.message_id);
-}
-
-async function handleGameDurationInput(msg, userState) {
-    const duration = parseInt(msg.text);
-    const game = activeGames.get(userState.chatId);
-    
-    if (!game) {
-        userStates.delete(msg.from.id);
-        return;
-    }
-    
-    if (duration < 1 || duration > 15) {
-        return bot.sendMessage(msg.chat.id, '❌ **مدة غير صحيحة!**\n\n⏰ يجب أن تكون المدة بين 1 و 15 دقيقة', {
-            parse_mode: 'Markdown'
-        });
-    }
-    
-    game.gameDuration = duration;
-    userStates.delete(msg.from.id);
-    
-    await bot.sendMessage(msg.chat.id, `✅ **تم إعداد اللعبة بنجاح!**\n\n📋 **ملخص اللعبة:**\n🎯 النوع: ${game.gameType === 'objects' ? 'أشياء 📦' : 'أماكن 📍'}\n👥 اللاعبين العاديين: ${game.normalPlayersCount}\n🕵️ الجواسيس: ${game.spiesCount}\n⏰ المدة: ${duration} دقيقة\n\n📨 **ارسل لي كلمة "start" في الخاص لترى دورك**`, {
-        parse_mode: 'Markdown'
-    });
-    
-    // توزيع الأدوار
-    gameLogic.distributeRoles(game);
-    game.status = 'waiting_start_requests';
-    
-    safeDeleteMessage(msg.chat.id, msg.message_id);
-}
-
-// =======================
-// أمر اللعبة الجديدة /newgame
-// =======================
-
+// أمر بدء لعبة جديدة
 bot.onText(/\/newgame/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const firstName = msg.from.first_name || 'المستخدم';
-    
-    // التحقق من نوع الدردشة
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
     if (msg.chat.type === 'private') {
-        return bot.sendMessage(chatId, '❌ هذا الأمر يعمل فقط في المجموعات!');
+        return bot.sendMessage(chatId, 'هذا الأمر يعمل فقط في المجموعات');
     }
-    
-    logUserAction(userId, 'COMMAND_NEWGAME');
-    await sendTypingAction(chatId);
-    
-    // التحقق من الإقصاء
-    if (isUserBanned(userId)) {
-        return bot.sendMessage(chatId, `${firstName}، أنت مقصي من اللعبة 🚫\nاتصل بالمطور للإفراج عنك\nالمطور: @V_b_L_o`);
+
+    // فحص إذا كان البوت مشرف
+    if (!(await isBotAdmin(chatId))) {
+        return bot.sendMessage(chatId, 'لا يمكن بدأ اللعبة الا وانا مشرف لذا ارفعني مشرف واعد المحاولة');
     }
-    
-    // التحقق من صلاحيات البوت
-    const isBotAdm = await isBotAdmin(chatId);
-    if (!isBotAdm) {
-        return bot.sendMessage(chatId, '❌ **لا استطيع إكمال اللعبة إلا عند رفعي أدمن!**', {
-            parse_mode: 'Markdown'
-        });
+
+    // فحص إذا كان هناك لعبة جارية
+    const activeGame = Object.values(data.games).find(game => 
+        game.chatId === chatId && game.status !== 'finished'
+    );
+
+    if (activeGame) {
+        return bot.sendMessage(chatId, 'لا يمكن بداية لعبة جديدة حتى تكمل البارتية');
     }
-    
-    // التحقق من وجود لعبة جارية
-    if (activeGames.has(chatId)) {
-        const game = activeGames.get(chatId);
-        return bot.sendMessage(chatId, `❌ **لا يمكن بداية لعبة جديدة حتى تكمل البارتية!**\n\n🎮 الحالة الحالية: ${getGameStatusText(game.status)}`, {
-            parse_mode: 'Markdown'
-        });
-    }
-    
-    const newGameKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '🔵 أبدا اللعبة', callback_data: 'start_new_game' }
-                ],
-                [
-                    { text: '🟠 كيفاه تتعلب هذي اللعبة', callback_data: 'game_instructions' }
-                ],
-                [
-                    { text: '🟣 انضم للقناة للمزيد من المتعة', url: 'https://t.me/+0ipdbPwuF304OWRk' }
-                ]
-            ]
-        }
+
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔵 أبدا اللعبة', callback_data: 'start_game' }],
+            [{ text: '🟠 كيفاه تتعلب هذي اللعبة', callback_data: 'rules' }],
+            [{ text: '🟣 انضم للقناة للمزيد من المتعة', url: 'https://t.me/+0ipdbPwuF304OWRk' }]
+        ]
     };
-    
-    await bot.sendMessage(chatId, `🤔 **${firstName}، حاب تبدا تلعب؟**\n\n🎯 اختر من الأزرار أدناه لبدء المغامرة!`, {
-        parse_mode: 'Markdown',
-        ...newGameKeyboard
-    });
+
+    await bot.sendMessage(chatId, '🤔 حاب تبدا تلعب؟', { reply_markup: keyboard });
 });
 
-// =======================
-// معالجة إضافة البوت للمجموعة
-// =======================
-
+// معالجة انضمام البوت للمجموعة
 bot.on('new_chat_members', async (msg) => {
     const chatId = msg.chat.id;
     const newMembers = msg.new_chat_members;
-    
+
     for (const member of newMembers) {
-        if (member.id === (await bot.getMe()).id) {
-            const isBotAdm = await isBotAdmin(chatId);
-            
-            if (!isBotAdm) {
-                await bot.sendMessage(chatId, '⚠️ **تنبيه مهم!**\n\nلا استطيع إكمال اللعبة إلا عند رفعي أدمن\n\n🔧 **يرجى منحي صلاحيات الإدارة للعمل بشكل صحيح**', {
-                    parse_mode: 'Markdown'
-                });
+        if (member.is_bot && member.username === 'spy_spy_bbot') {
+            if (!(await isBotAdmin(chatId))) {
+                await bot.sendMessage(chatId, 'لا يمكن بدأ اللعبة الا وانا مشرف لذا ارفعني مشرف واعد المحاولة');
             } else {
-                const welcomeKeyboard = {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                { text: '🎮 ابدأ لعبة جديدة', callback_data: 'start_new_game' }
-                            ],
-                            [
-                                { text: '📖 تعلم كيفية اللعب', callback_data: 'game_instructions' }
-                            ]
-                        ]
-                    }
-                };
-                
-                await bot.sendMessage(chatId, `👋 **شكراً لإضافتي!**\n\n🎉 **مرحباً بكم في عالم Spyfall المثير!**\n\n🎯 اضغط على /newgame للبدء\n🔗 انضموا لقناتنا: https://t.me/+0ipdbPwuF304OWRk`, {
-                    parse_mode: 'Markdown',
-                    ...welcomeKeyboard
-                });
+                await bot.sendMessage(chatId, '👋 شكرًا لإضافتي! لبدا اللعبة اضغط على /newgame للبدء.');
             }
-        }
-    }
-});
-
-// =======================
-// معالجة الأوامر الخاصة
-// =======================
-
-bot.onText(/^start$/i, async (msg) => {
-    if (msg.chat.type !== 'private') return;
-    
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    
-    await sendTypingAction(chatId);
-    
-    // البحث عن اللعبة التي ينتمي إليها المستخدم
-    let userGame = null;
-    let gameChatId = null;
-    
-    for (const [gChatId, game] of activeGames.entries()) {
-        if (game.status === 'waiting_start_requests' && 
-            game.players.some(p => p.id === userId)) {
-            userGame = game;
-            gameChatId = gChatId;
             break;
         }
     }
-    
-    if (!userGame) {
-        return bot.sendMessage(chatId, '❌ لا توجد لعبة متاحة لك\n\n🎯 ابحث عن مجموعة تلعب Spyfall وانضم إليها!');
-    }
-    
-    const player = userGame.players.find(p => p.id === userId);
-    if (!player) return;
-    
-    if (player.role === 'spy') {
-        // رسالة للجاسوس
-        try {
-            await bot.sendPhoto(chatId, 'https://pin.it/2Xv5gZUHU', {
-                caption: '🕵️‍♂️ أنت هو الجاسوس!\n\n🎭 مهمتك:\n🔍 اكتشف المكان أو الشيء السري\n🤫 لا تفضح نفسك\n💬 اسأل أسئلة ذكية\n⚡ تذكر: يمكنك إعلان تخمينك في أي وقت\n\n🔥 اعرف كيفاه تلعب وتجاوب، ماتخليهمش يكشفوك!'
-            });
-        } catch (error) {
-            await bot.sendMessage(chatId, '🕵️‍♂️ أنت هو الجاسوس!\n\n🎭 مهمتك:\n🔍 اكتشف المكان أو الشيء السري\n🤫 لا تفضح نفسك\n💬 اسأل أسئلة ذكية\n⚡ تذكر: يمكنك إعلان تخمينك في أي وقت\n\n🔥 اعرف كيفاه تلعب وتجاوب، ماتخليهمش يكشفوك!');
-        }
-    } else {
-        // رسالة للاعب عادي
-        const itemType = userGame.gameType === 'objects' ? 'الشيء' : 'الموقع';
-        const itemIcon = userGame.gameType === 'objects' ? '📦' : '📍';
-        
-        await bot.sendMessage(chatId, `👤 أنت ماكش جاسوس 🚫🕵️\n\n${itemIcon} ${itemType}: ${userGame.selectedItem}\n\n🎯 مهمتك:\n🔍 اكتشف من هو الجاسوس\n💬 اسأل أسئلة ذكية دون فضح ${itemType}\n🗳️ صوت على الجاسوس المشكوك فيه\n\n💡 تذكر: الجاسوس لا يعرف ${itemType}!`);
-    }
-    
-    userGame.startRequests.add(userId);
-    logUserAction(userId, 'RECEIVED_ROLE', player.role);
-    
-    // التحقق من استلام جميع اللاعبين لأدوارهم
-    if (userGame.startRequests.size === userGame.players.length) {
-        startGameplay(gameChatId);
-    }
 });
 
-
-// =======================
-// دوال مساعدة للعبة
-// =======================
-
-async function updateGameMessage(chatId, messageId, game) {
-    const playersText = game.players.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
-    const remainingTime = Math.max(0, 90 - Math.floor((Date.now() - game.createdAt) / 1000));
-    
-    const gameKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '🟢 انضم للعبة', callback_data: 'join_game' }
-                ],
-                [
-                    { text: '🟠 كيفاه تتعلب هذي اللعبة', callback_data: 'game_instructions' }
-                ],
-                [
-                    { text: '🟣 انضم للقناة للمزيد من المتعة', url: 'https://t.me/+0ipdbPwuF304OWRk' }
-                ]
-            ]
-        }
-    };
-    
+// توزيع الأدوار
+async function distributeRoles(game) {
     try {
-        await bot.editMessageText(
-            `🎮 **لعبة جديدة جاهزة!**\n\n👥 **اللاعبين (${game.players.length}):**\n${playersText || 'لا يوجد لاعبين بعد'}\n\n⏳ **الوقت المتبقي:** ${remainingTime} ثانية`,
-            {
-                chat_id: chatId,
-                message_id: messageId,
-                parse_mode: 'Markdown',
-                ...gameKeyboard
-            }
-        );
-    } catch (error) {
-        console.error('Error updating game message:', error);
-    }
-}
-
-async function proceedToGameSetup(chatId) {
-    const game = activeGames.get(chatId);
-    if (!game) return;
-    
-    if (game.players.length < 3) {
-        await bot.sendMessage(chatId, '❌ **عذراً، نحتاج 3 لاعبين على الأقل لبدء اللعبة!**\n\n🎯 ادعوا أصدقاءكم وحاولوا مرة أخرى', {
-            parse_mode: 'Markdown'
+        const players = [...game.players];
+        const spyCount = game.spies;
+        
+        // اختيار الجواسيس عشوائياً
+        const shuffled = players.sort(() => 0.5 - Math.random());
+        const spies = shuffled.slice(0, spyCount);
+        const normalPlayers = shuffled.slice(spyCount);
+        
+        // تحديد الموضوع/المكان
+        const itemsList = game.gameType === 'items' ? items : places;
+        const randomItem = itemsList[Math.floor(Math.random() * itemsList.length)];
+        game.currentItem = randomItem;
+        
+        // إعطاء الأدوار
+        spies.forEach(spy => {
+            spy.role = 'spy';
+            spy.receivedRole = false;
         });
-        activeGames.delete(chatId);
-        return;
+        
+        normalPlayers.forEach(player => {
+            player.role = 'normal';
+            player.receivedRole = false;
+        });
+        
+        game.status = 'distributing';
+        game.rolesSent = false;
+        
+        console.log(`توزيع الأدوار: ${spyCount} جواسيس، ${normalPlayers.length} لاعبين عاديين`);
+        console.log(`الموضوع: ${randomItem}`);
+        
+        saveData();
+        
+        // إرسال رسالة إرشادية للمجموعة
+        await bot.sendMessage(game.chatId, 'ارسل لي كلمة start في الخاص ل ترى دورك');
+        
+        // انتظار ثانيتين ثم إرسال الأدوار مباشرة
+        setTimeout(async () => {
+            await sendRolesToPlayers(game);
+            
+            // بدء اللعبة بعد إرسال الأدوار بـ 10 ثوان
+            setTimeout(async () => {
+                if (!game.gameStarted) {
+                    await startGame(game);
+                }
+            }, 10000);
+        }, 2000);
+        
+    } catch (error) {
+        console.error('خطأ في توزيع الأدوار:', error);
+        await bot.sendMessage(game.chatId, 'حدث خطأ في توزيع الأدوار. سيتم إعادة المحاولة...');
+        
+        setTimeout(() => {
+            distributeRoles(game);
+        }, 5000);
+    }
+}
+// إرسال الأدوار للاعبين
+async function sendRolesToPlayers(game) {
+    let successCount = 0;
+    let failedPlayers = [];
+    
+    for (const player of game.players) {
+        try {
+            if (player.role === 'spy') {
+                await bot.sendMessage(player.id, 'أنت هو الجاسوس 🕵️‍♂️ اعرف كيفاه تلعب وتجاوب، ماتخليهمش يكشفوك!');
+                
+                try {
+                    await bot.sendPhoto(player.id, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/Spy_role.jpg');
+                } catch (photoError) {
+                    console.log(`لا يمكن إرسال صورة الجاسوس للاعب ${player.name}`);
+                }
+            } else {
+                const itemType = game.gameType === 'items' ? 'الشيء' : 'المكان';
+                await bot.sendMessage(player.id, `أنت ماكش جاسوس 🚫🕵️\n${itemType}: ${game.currentItem}`);
+            }
+            
+            player.receivedRole = true;
+            successCount++;
+            console.log(`تم إرسال الدور للاعب: ${player.name}`);
+            
+        } catch (error) {
+            console.error(`لا يمكن إرسال الدور للاعب ${player.name}:`, error.message);
+            failedPlayers.push(player.name);
+        }
     }
     
-    game.status = 'choosing_type';
+    game.rolesSent = true;
+    saveData();
     
-    const typeKeyboard = {
-        reply_markup: {
-            inline_keyboard: [
-                [
-                    { text: '📦 اشياء', callback_data: 'select_objects' },
-                    { text: '📍 اماكن', callback_data: 'select_places' }
-                ]
-            ]
-        }
-    };
-    
-    await bot.sendMessage(chatId, `🎯 **واش حابين؟**\n\n📊 **عدد اللاعبين:** ${game.players.length}\n\n🎮 اختاروا نوع اللعبة:`, {
-        parse_mode: 'Markdown',
-        ...typeKeyboard
-    });
+    // إرسال تقرير في المجموعة
+    if (failedPlayers.length > 0) {
+        await bot.sendMessage(game.chatId, 
+            `⚠️ تم إرسال الأدوار لـ ${successCount} لاعب من أصل ${game.players.length}\n` +
+            `لم يتمكن من إرسال الأدوار لـ: ${failedPlayers.join(', ')}\n` +
+            `تأكدوا من بدء محادثة مع البوت في الخاص أولاً.`
+        );
+    } else {
+        await bot.sendMessage(game.chatId, `✅ تم إرسال جميع الأدوار بنجاح!`);
+    }
 }
 
-async function startGameplay(chatId) {
-    const game = activeGames.get(chatId);
-    if (!game) return;
+// بدء اللعبة
+async function startGame(game) {
+    if (!game || game.status !== 'distributing' || game.gameStarted) return;
     
     game.status = 'playing';
-    game.gameStartTime = Date.now();
+    game.startTime = Date.now();
+    game.gameStarted = true;
     
-    await bot.sendMessage(chatId, `📢 **صَيَّبو مدينا الأدوار، ابداو تلعبو!** 🎲🕰️\n\n🎯 **نوع اللعبة:** ${game.gameType === 'objects' ? 'أشياء 📦' : 'أماكن 📍'}\n⏰ **مدة اللعبة:** ${game.gameDuration} دقيقة\n👥 **عدد اللاعبين:** ${game.players.length}\n🕵️ **عدد الجواسيس:** ${game.spiesCount}\n\n🔥 **دعوا المغامرة تبدأ!**`, {
-        parse_mode: 'Markdown'
-    });
+    console.log('بدء اللعبة بعد توزيع الأدوار');
     
-    // تايمر انتهاء اللعبة
-    const gameEndTime = (game.gameDuration * 60 - 40) * 1000;
+    await bot.sendMessage(game.chatId, '📢 صَيَّبو مدينا الأدوار، ابداو تلعبو! 🎲🕰️');
     
-    setTimeout(() => {
-        startVotingPhase(chatId);
-    }, gameEndTime);
+    // مؤقت انتهاء اللعبة
+    const duration = game.duration * 60 * 1000;
+    
+    setTimeout(async () => {
+        if (game.status === 'playing') {
+            await startVoting(game);
+        }
+    }, duration - 40000);
+    
+    saveData();
 }
 
-async function startVotingPhase(chatId) {
-    const game = activeGames.get(chatId);
+// بدء التصويت
+async function startVoting(game) {
     if (!game || game.status !== 'playing') return;
     
     game.status = 'voting';
-    game.votes = new Map();
+    game.votes = {};
     
-    await bot.sendMessage(chatId, `⏰ **وقت التصويت!**\n\n📨 **أرسلت لكم التصويت في الخاص**\n\n🗳️ صوتوا على من تشكون أنه الجاسوس!`, {
-        parse_mode: 'Markdown'
-    });
+    await bot.sendMessage(game.chatId, '⏰ أرسلت لكم التصويت في الخاص لتصوتو على كل واحد على من هو الجاسوس ركزو جيدا فالعقاب شديد');
     
     // إرسال أزرار التصويت لكل لاعب
     for (const player of game.players) {
-        await sendVotingButtons(player.id, game, chatId);
+        const otherPlayers = game.players.filter(p => p.id !== player.id);
+        const voteKeyboard = {
+            inline_keyboard: otherPlayers.map(p => [{
+                text: p.name,
+                callback_data: `vote_${p.id}_${Object.keys(data.games).find(key => data.games[key] === game)}`
+            }])
+        };
+        
+        try {
+            await bot.sendMessage(player.id, 'على من تصوت أنه الجاسوس؟', { reply_markup: voteKeyboard });
+        } catch (error) {
+            console.log(`لا يمكن إرسال رسالة للاعب ${player.name}`);
+        }
     }
     
-    // تايمر انتهاء التصويت
-    setTimeout(() => {
-        endVotingPhase(chatId);
+    // انتهاء التصويت بعد 60 ثانية
+    setTimeout(async () => {
+        if (game.status === 'voting') {
+            await endGame(Object.keys(data.games).find(key => data.games[key] === game));
+        }
     }, 60000);
+    
+    saveData();
 }
 
-async function sendVotingButtons(userId, game, gameChatId) {
-    const buttons = game.players
-        .filter(p => p.id !== userId)
-        .map(p => [{
-            text: p.name,
-            callback_data: `vote_${gameChatId}_${p.id}_${userId}`
-        }]);
-    
-    if (buttons.length === 0) return;
-    
-    try {
-        await bot.sendMessage(userId, `🗳️ **على من تصوت أنه الجاسوس؟**\n\n⚠️ **تذكر:** لا يمكن التصويت مرتين!`, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: buttons
-            }
-        });
-    } catch (error) {
-        console.error(`Error sending voting buttons to user ${userId}:`, error);
-    }
-}
-
-async function handleVoting(query) {
-    const [, gameChatId, targetId, voterId] = query.data.split('_').map(Number);
-    const chatId = parseInt(gameChatId);
-    
-    const game = activeGames.get(chatId);
-    if (!game || game.status !== 'voting') {
-        return bot.answerCallbackQuery(query.id, '❌ التصويت غير متاح حالياً!', true);
-    }
-    
-    // التحقق من عدم التصويت مسبقاً
-    if (game.votes.has(voterId)) {
-        return bot.answerCallbackQuery(query.id, '⚠️ لقد صوتت بالفعل!', true);
-    }
-    
-    game.votes.set(voterId, targetId);
-    
-    const targetPlayer = game.players.find(p => p.id === targetId);
-    const voterPlayer = game.players.find(p => p.id === voterId);
-    
-    if (!targetPlayer || !voterPlayer) return;
-    
-    // إعلان في المجموعة
-    await bot.sendMessage(chatId, `🗳️ **${voterPlayer.name}** صوت لإعدام **${targetPlayer.name}** ⚡`, {
-        parse_mode: 'Markdown'
-    });
-    
-    bot.answerCallbackQuery(query.id, `✅ تم تصويتك لـ ${targetPlayer.name}`);
-    logUserAction(voterId, 'VOTED', `Target: ${targetId}`);
-}
-
-async function endVotingPhase(chatId) {
-    const game = activeGames.get(chatId);
+// انتهاء اللعبة
+async function endGame(gameId) {
+    const game = data.games[gameId];
     if (!game) return;
     
+    game.status = 'finished';
+    
     // حساب النتائج
-    const results = gameLogic.calculateVotingResults(game);
-    
-    await bot.sendMessage(chatId, `📊 **نتائج التصويت:**\n\n${results.summary}`, {
-        parse_mode: 'Markdown'
+    const voteCounts = {};
+    Object.values(game.votes).forEach(vote => {
+        voteCounts[vote] = (voteCounts[vote] || 0) + 1;
     });
     
-    // تحديد الفائز
-    if (results.winner === 'spies') {
-        await handleSpyVictory(chatId, game);
-    } else {
-        await handlePlayersVictory(chatId, game);
-    }
+    // العثور على اللاعب الأكثر حصولاً على الأصوات
+    const mostVoted = Object.keys(voteCounts).reduce((a, b) => 
+        voteCounts[a] > voteCounts[b] ? a : b
+    );
     
-    // إنهاء اللعبة
-    activeGames.delete(chatId);
-}
-
-async function handleSpyVictory(chatId, game) {
-    await bot.sendMessage(chatId, '🎉 **فاز الجاسوس!** 🕵️‍♂️', {
-        parse_mode: 'Markdown'
-    });
+    const mostVotedPlayer = game.players.find(p => p.id.toString() === mostVoted);
+    const spies = game.players.filter(p => p.role === 'spy');
     
-    try {
-        await bot.sendVideo(chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/spy_win.mp4', {
-            caption: `🏆 **تهانينا للجاسوس!**\n\n💰 **جائزة الجاسوس:** 2,000,000,000 د.ج\n\n⚖️ **عاقبوا اللاعبين بما تريدون، وإذا لم يطبقوا الحكم، ارسلوا أسماءهم لـ @V_b_L_o ليخرجهم من اللعبة نهائياً.**`,
-            parse_mode: 'Markdown'
-        });
-    } catch (error) {
-        await bot.sendMessage(chatId, `🏆 **تهانينا للجاسوس!**\n\n💰 **جائزة الجاسوس:** 2,000,000,000 د.ج\n\n⚖️ **عاقبوا اللاعبين بما تريدون، وإذا لم يطبقوا الحكم، ارسلوا أسماءهم لـ @V_b_L_o ليخرجهم من اللعبة نهائياً.**`, {
-            parse_mode: 'Markdown'
-        });
-    }
+    let spiesWon = false;
+    let winMessage = '';
     
-    // إضافة الجوائز
-    for (const player of game.players) {
-        if (player.role === 'spy') {
-            banking.addMoney(player.id, 2000000000);
-            database.updateUserStats(player.id, 'spy_wins', 1);
-        } else {
-            database.updateUserStats(player.id, 'spy_losses', 1);
-        }
-    }
-    
-    await showGameResults(chatId, game, 'spies');
-}
-
-async function handlePlayersVictory(chatId, game) {
-    await bot.sendMessage(chatId, '🎊 **فاز اللاعبون!** 👥', {
-        parse_mode: 'Markdown'
-    });
-    
-    try {
-        await bot.sendVideo(chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/players_win.mp4', {
-            caption: `🏆 **تهانينا للاعبين!**\n\n💸 **جائزة كل لاعب:** 100,000 د.ج\n\n⚖️ **عاقبوا الجاسوس بما تريدون، وإذا لم تُطبق العقوبة، ارسلوا اسمه لـ @V_b_L_o ليُقصى نهائياً.**`,
-            parse_mode: 'Markdown'
-        });
-    } catch (error) {
-        await bot.sendMessage(chatId, `🏆 **تهانينا للاعبين!**\n\n💸 **جائزة كل لاعب:** 100,000 د.ج\n\n⚖️ **عاقبوا الجاسوس بما تريدون، وإذا لم تُطبق العقوبة، ارسلوا اسمه لـ @V_b_L_o ليُقصى نهائياً.**`, {
-            parse_mode: 'Markdown'
-        });
-    }
-    
-    // إضافة الجوائز
-    for (const player of game.players) {
-        if (player.role !== 'spy') {
-            banking.addMoney(player.id, 100000);
-            database.updateUserStats(player.id, 'player_wins', 1);
-        } else {
-            database.updateUserStats(player.id, 'player_losses', 1);
-        }
-    }
-    
-    await showGameResults(chatId, game, 'players');
-}
-
-async function showGameResults(chatId, game, winner) {
-    const itemType = game.gameType === 'objects' ? 'الشيء' : 'الموقع';
-    const itemIcon = game.gameType === 'objects' ? '📦' : '📍';
-    
-    let resultsText = `📋 **نتائج اللعبة:**\n\n${itemIcon} **${itemType}:** ${game.selectedItem}\n\n👥 **اللاعبين:**\n`;
-    
-    for (const player of game.players) {
-        const roleIcon = player.role === 'spy' ? '🕵️' : '👤';
-        const roleText = player.role === 'spy' ? 'جاسوس' : 'عادي';
-        const statusIcon = (winner === 'spies' && player.role === 'spy') || 
-                          (winner === 'players' && player.role !== 'spy') ? '✅' : '❌';
-        const statusText = statusIcon === '✅' ? 'ربح' : 'خسر';
+    if (mostVotedPlayer && mostVotedPlayer.role === 'spy') {
+        // فوز اللاعبين العاديين
+        winMessage = '🎊 فاز اللاعبون!';
         
-        resultsText += `${roleIcon} **${player.name}** - ${roleText} - ${statusText} ${statusIcon}\n`;
+        // إضافة الأموال للاعبين العاديين
+        game.players.forEach(player => {
+            if (player.role === 'normal') {
+                if (!data.users[player.id]) data.users[player.id] = { money: 0, items: {} };
+                data.users[player.id].money += 100000;
+            }
+        });
+        
+        winMessage += '\n💸 مكافأة لكل لاعب: 100,000 د.ج';
+        winMessage += '\n"عاقبوا الجاسوس بما تريدون، وإذا لم تُطبق العقوبة، ارسلوا اسمه لـ @V_b_L_o ليُقصى نهائيًا."';
+        
+        // إرسال فيديو فوز اللاعبين
+        try {
+            await bot.sendVideo(game.chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/players_win.mp4', { caption: winMessage });
+        } catch (error) {
+            await bot.sendMessage(game.chatId, winMessage);
+        }
+    } else {
+        // فوز الجواسيس
+        spiesWon = true;
+        winMessage = '🎉 فاز الجاسوس!';
+        
+        // إضافة الأموال للجواسيس
+        spies.forEach(spy => {
+            if (!data.users[spy.id]) data.users[spy.id] = { money: 0, items: {} };
+            data.users[spy.id].money += 2000000000;
+        });
+        
+        winMessage += '\n💰 جائزة مالية: 2,000,000,000 د.ج';
+        winMessage += '\n"عاقبوا اللاعبين بما تريدون، وإذا لم يطبقوا الحكم، ارسلوا أسمائهم لـ @V_b_L_o ليخرجهم من اللعبة نهائيًا."';
+        
+        // إرسال فيديو فوز الجاسوس
+        try {
+            await bot.sendVideo(game.chatId, 'https://raw.githubusercontent.com/hamza8910/3lahthaws-bot/main/assets/spy_win.mp4', { caption: winMessage });
+        } catch (error) {
+            await bot.sendMessage(game.chatId, winMessage);
+        }
     }
     
-    await bot.sendMessage(chatId, resultsText, {
-        parse_mode: 'Markdown'
+    // عرض النتائج
+    let resultsMessage = `\n\n${game.gameType === 'items' ? '📦 الشيء' : '📍 المكان'}: ${game.currentItem}\n\n`;
+    resultsMessage += '📋 نتائج اللاعبين:\n';
+    
+    game.players.forEach((player, index) => {
+        const status = (player.role === 'spy' && spiesWon) || (player.role === 'normal' && !spiesWon) ? 'ربح' : 'خسر';
+        const roleEmoji = player.role === 'spy' ? '🕵️‍♂️' : '👤';
+        resultsMessage += `${index + 1}. ${player.name} ${roleEmoji} - ${status}\n`;
     });
+    
+    await bot.sendMessage(game.chatId, resultsMessage);
+    
+    // حذف اللعبة
+    delete data.games[gameId];
+    saveData();
 }
 
-// =======================
-// معالجة الأوامر الخاصة والمتجر
-// =======================
+// معالجة الشراء
+async function handlePurchase(chatId, userId, text) {
+    const parts = text.split(' ');
+    if (parts.length < 3) return;
+    
+    const quantity = parseInt(parts[1]);
+    const itemName = parts.slice(2).join(' ');
+    
+    if (!shopItems[itemName]) {
+        return bot.sendMessage(chatId, 'هذا المنتج غير موجود في المتجر');
+    }
+    
+    if (!data.users[userId]) {
+        data.users[userId] = { money: 0, items: {} };
+    }
+    
+    const totalPrice = shopItems[itemName] * quantity;
+    
+    if (data.users[userId].money < totalPrice) {
+        return bot.sendMessage(chatId, 'ليس لديك مال كافي');
+    }
+    
+    data.users[userId].money -= totalPrice;
+    data.users[userId].items[itemName] = (data.users[userId].items[itemName] || 0) + quantity;
+    
+    await bot.sendMessage(chatId, `💵 لقد اشتريت ${quantity} ${itemName} بسعر ${totalPrice.toLocaleString()} د.ج\nتبقى لديك ${data.users[userId].money.toLocaleString()} د.ج`);
+    
+    saveData();
+}
 
-async function handlePrivateCommands(msg) {
-    const text = msg.text.toLowerCase();
+// معالجة البيع
+async function handleSell(chatId, userId, text) {
+    const parts = text.split(' ');
+    if (parts.length < 3) return;
+    
+    const quantity = parseInt(parts[1]);
+    const itemName = parts.slice(2).join(' ');
+    
+    if (!data.users[userId] || !data.users[userId].items[itemName] || data.users[userId].items[itemName] < quantity) {
+        return bot.sendMessage(chatId, 'ليس لديك هذا المنتج بالكمية المطلوبة');
+    }
+    
+    const sellPrice = Math.floor(shopItems[itemName] * quantity * 0.75);
+    
+    data.users[userId].money += sellPrice;
+    data.users[userId].items[itemName] -= quantity;
+    
+    if (data.users[userId].items[itemName] === 0) {
+        delete data.users[userId].items[itemName];
+    }
+    
+    await bot.sendMessage(chatId, `💰 استرجعت ${sellPrice.toLocaleString()} د.ج (75% من المبلغ الأصلي)`);
+    
+    saveData();
+}
+
+// عرض ممتلكات المستخدم
+async function showUserItems(chatId, userId) {
+    if (!data.users[userId]) {
+        return bot.sendMessage(chatId, 'ليس لديك أي ممتلكات');
+    }
+    
+    let message = `💼 ممتلكاتك:\n💰 الرصيد: ${data.users[userId].money.toLocaleString()} د.ج\n\n`;
+    
+    if (Object.keys(data.users[userId].items).length === 0) {
+        message += 'لا توجد منتجات';
+    } else {
+        Object.entries(data.users[userId].items).forEach(([item, quantity]) => {
+            message += `• ${item}: ${quantity}\n`;
+        });
+    }
+    
+    await bot.sendMessage(chatId, message);
+}
+
+// عرض خيارات البنك
+async function showBankOptions(chatId, userId) {
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: 'بدر', callback_data: 'bank_badr' }],
+            [{ text: 'الهلال', callback_data: 'bank_hilal' }],
+            [{ text: 'أويحي', callback_data: 'bank_ouihi' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, 'اختر البنك:', { reply_markup: keyboard });
+}
+
+// معالجة التحويل
+async function handleTransfer(chatId, userId, text) {
+    const parts = text.split(' ');
+    if (parts.length < 2) return;
+    
+    const amount = parseInt(parts[1]);
+    
+    if (!data.users[userId] || data.users[userId].money < amount) {
+        return bot.sendMessage(chatId, 'ليس لديك رصيد كافي');
+    }
+    
+    const commission = Math.floor(amount * 0.15);
+    const finalAmount = amount - commission;
+    
+    await bot.sendMessage(chatId, `يرسل رقم حساب المستفيد لتحويل ${finalAmount.toLocaleString()} د.ج (بعد خصم عمولة 15%)`);
+}
+
+// أوامر المساعدة
+bot.onText(/\/help/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
+    const helpText = `🤖 أوامر البوت:
+
+🎮 أوامر اللعبة:
+/start - بدء البوت
+/newgame - بدء لعبة جديدة
+/help - عرض هذه القائمة
+
+🛒 أوامر المتجر:
+/shop - عرض المتجر
+شراء [الكمية] [المنتج] - شراء منتج
+بيع [الكمية] [المنتج] - بيع منتج
+ممتلكاتي - عرض ممتلكاتك
+
+🏦 أوامر البنك:
+/bank - البنك
+حلي بونكا - فتح حساب بنكي
+فارسي [المبلغ] - تحويل الأموال
+
+📊 أوامر الإحصائيات:
+/profile - إحصائياتك
+/stats - إحصائيات المجموعة`;
+
+    await bot.sendMessage(chatId, helpText);
+});
+
+// أمر المتجر
+bot.onText(/\/shop/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
+    let shopText = '🛒 متجر البوت:\n\n';
+    
+    Object.entries(shopItems).forEach(([item, price]) => {
+        shopText += `• ${item}: ${price.toLocaleString()} د.ج\n`;
+    });
+    
+    shopText += '\n💡 للشراء: شراء [الكمية] [المنتج]\n💡 للبيع: بيع [الكمية] [المنتج]';
+    
+    await bot.sendMessage(chatId, shopText);
+});
+
+// أمر الإحصائيات
+bot.onText(/\/profile/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    if (isBanned(userId)) {
+        return bot.sendMessage(chatId, 'انت مقصي اتصل بالمطور للافراج عنك المطور: @V_b_L_o');
+    }
+
+    if (!data.users[userId]) {
+        data.users[userId] = { money: 0, items: {}, gamesPlayed: 0, wins: 0, spyWins: 0 };
+    }
+
+    const user = data.users[userId];
+    const profileText = `📊 إحصائياتك:
+💰 الرصيد: ${user.money.toLocaleString()} د.ج
+🎮 الألعاب المُلعبة: ${user.gamesPlayed || 0}
+🏆 الانتصارات: ${user.wins || 0}
+🕵️‍♂️ انتصارات الجاسوس: ${user.spyWins || 0}`;
+
+    await bot.sendMessage(chatId, profileText);
+});
+
+// أوامر المطور
+bot.onText(/\/ban (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     
-    // أوامر البنك
-    if (text === 'حلي بونكا') {
-        await banking.handleCreateAccount(msg, bot);
-    } else if (text.startsWith('فارسي ')) {
-        await banking.handleTransfer(msg, bot);
+    if (userId !== developerId) return;
+    
+    const targetId = parseInt(match[1]);
+    if (!data.banned.includes(targetId)) {
+        data.banned.push(targetId);
+        saveData();
+        await bot.sendMessage(chatId, `تم حظر المستخدم ${targetId}`);
     }
-    
-    // أوامر المتجر
-    else if (text.startsWith('شراء ')) {
-        await shop.handlePurchase(msg, bot);
-    } else if (text.startsWith('بيع ')) {
-        await shop.handleSell(msg, bot);
-    } else if (text === 'ممتلكاتي') {
-        await shop.handleInventory(msg, bot);
-    }
-    
-    // معلومات الحساب
-    else if (text === 'حسابي' || text === 'رصيدي') {
-        await banking.handleAccountInfo(msg, bot);
-    }
-}
-
-// =======================
-// أوامر المطور
-// =======================
-
-bot.onText(/\/ban (.+)/, async (msg, match) => {
-    const userId = msg.from.id;
-    const targetUsername = match[1];
-    
-    if (!config.DEVELOPER_IDS.includes(userId)) {
-        return bot.sendMessage(msg.chat.id, '❌ هذا الأمر للمطور فقط!');
-    }
-    
-    // هنا يجب تحويل اسم المستخدم إلى ID
-    // في هذا المثال، نفترض أن المدخل هو ID مباشرة
-    const targetId = parseInt(targetUsername);
-    
-    if (isNaN(targetId)) {
-        return bot.sendMessage(msg.chat.id, '❌ معرف مستخدم غير صحيح!');
-    }
-    
-    bannedUsers.add(targetId);
-    database.banUser(targetId);
-    
-    await bot.sendMessage(msg.chat.id, `✅ تم إقصاء المستخدم ${targetId} من اللعبة`);
-    logUserAction(userId, 'BANNED_USER', targetId.toString());
 });
 
 bot.onText(/\/unban (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
     const userId = msg.from.id;
-    const targetUsername = match[1];
     
-    if (!config.DEVELOPER_IDS.includes(userId)) {
-        return bot.sendMessage(msg.chat.id, '❌ هذا الأمر للمطور فقط!');
+    if (userId !== developerId) return;
+    
+    const targetId = parseInt(match[1]);
+    const index = data.banned.indexOf(targetId);
+    if (index > -1) {
+        data.banned.splice(index, 1);
+        saveData();
+        await bot.sendMessage(chatId, `تم إلغاء حظر المستخدم ${targetId}`);
     }
-    
-    const targetId = parseInt(targetUsername);
-    
-    if (isNaN(targetId)) {
-        return bot.sendMessage(msg.chat.id, '❌ معرف مستخدم غير صحيح!');
-    }
-    
-    bannedUsers.delete(targetId);
-    database.unbanUser(targetId);
-    
-    await bot.sendMessage(msg.chat.id, `✅ تم إلغاء إقصاء المستخدم ${targetId}`);
-    logUserAction(userId, 'UNBANNED_USER', targetId.toString());
 });
 
-// =======================
-// معالجة عرض الأوامر
-// =======================
+// بدء البوت
+console.log('🤖 بوت Spyfall يعمل الآن...');
 
-bot.onText(/\//, (msg) => {
-    if (msg.chat.type === 'private' || msg.text.length > 1) return;
-    
-    const commands = `📋 **الأوامر المتاحة:**
+// حفظ البيانات كل 5 دقائق
+setInterval(saveData, 5 * 60 * 1000);
 
-🎮 **/newgame** - بدء لعبة جديدة
-ℹ️ **/start** - معلومات عن البوت
-🏪 **المتجر** - شراء وبيع السلع
-🏦 **البنك** - إدارة الحساب المالي
-
-💡 **نصائح:**
-• استخدم الأزرار للتفاعل السريع
-• اتبع التعليمات خطوة بخطوة
-• استمتع باللعبة! 🎉`;
-    
-    bot.sendMessage(msg.chat.id, commands, {
-        parse_mode: 'Markdown'
-    });
-});
-
-// =======================
-// دوال مساعدة إضافية
-// =======================
-
-function getGameStatusText(status) {
-    const statusTexts = {
-        'waiting_players': 'انتظار اللاعبين',
-        'choosing_type': 'اختيار نوع اللعبة',
-        'setting_up': 'إعداد اللعبة',
-        'waiting_start_requests': 'انتظار استلام الأدوار',
-        'playing': 'جارية',
-        'voting': 'مرحلة التصويت'
-    };
-    
-    return statusTexts[status] || 'غير محدد';
-}
-
-// =======================
-// تحميل البيانات المحفوظة
-// =======================
-
-async function loadSavedData() {
-    try {
-        const savedBannedUsers = await database.getBannedUsers();
-        bannedUsers = new Set(savedBannedUsers);
-        console.log('✅ تم تحميل البيانات المحفوظة بنجاح');
-    } catch (error) {
-        console.error('❌ خطأ في تحميل البيانات:', error);
-    }
-}
-
-// =======================
-// حفظ البيانات دورياً
-// =======================
-
-setInterval(async () => {
-    try {
-        await database.saveData({
-            bannedUsers: Array.from(bannedUsers),
-            activeGamesCount: activeGames.size,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('خطأ في حفظ البيانات:', error);
-    }
-}, 60000); // حفظ كل دقيقة
-
-// =======================
-// معالجة الأخطاء العامة
-// =======================
-
-bot.on('polling_error', (error) => {
-    console.error('Polling error:', error);
-});
-
-bot.on('error', (error) => {
-    console.error('Bot error:', error);
-});
-
+// معالجة الأخطاء
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.log('خطأ غير معالج:', reason);
 });
 
-// =======================
-// بدء تشغيل البوت
-// =======================
-
-async function startBot() {
-    try {
-        await loadSavedData();
-        console.log('🎮 بوت Spyfall يعمل بنجاح!');
-        console.log('👨‍💻 المطور: @V_b_L_o');
-        console.log('🔗 الرابط: https://t.me/spy_spy_bbot');
-    } catch (error) {
-        console.error('❌ خطأ في تشغيل البوت:', error);
-    }
-}
-
-// تشغيل البوت
-startBot();
-
-// تصدير المتغيرات المهمة للملفات الأخرى
-module.exports = {
-    bot,
-    activeGames,
-    bannedUsers,
-    userStates,
-    logUserAction,
-    sendTypingAction
-};
+process.on('uncaughtException', (error) => {
+    console.log('خطأ غير متوقع:', error);
+});
